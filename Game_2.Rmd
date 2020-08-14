@@ -1,0 +1,180 @@
+---
+title: "Game_2"
+output:
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(ggplot2)
+library(rvest)
+library(tidyverse)
+library(magick)
+library(shiny)
+library(purrr)
+library(plotly)
+```
+
+Player Stats
+==========================
+
+Column {data-width=650}
+-----------------------------------------------------------------------
+
+```{r data}
+load("~/Desktop/Capstone/Data/gl2_df.rda") # Game Log (12/31/2019)
+```
+
+### This table displays Player Statisics for Game (12/31/2019)
+
+```{r eda1}
+gl2_df%>%
+  select(., -'Dates',-'TSPer',-'eFG',-'ThreeR',-'FTR',-'GmSc',-'TOP',-'EFF',-'USG',-'POS',-'PPP') -> gl1_df2
+
+  gl2_df%>%
+  select(., -'Dates') -> gl1adv_df
+  
+   gl2_df%>%
+  select(., -'Dates',-'ORB',-'DRB',-'FGM',-'FGA',-'ThreeP',-'ThreePA',-'FT',-'FTA',-'FGP',-'ThreePer',-'FTP',) -> gl1adv2_df
+      
+
+# Game Log Table 
+gltable <- plot_ly(
+  type = 'table',
+   columnwidth = c(0,800),
+  header = list(
+    values = c("<b>Players</b>", names(gl1_df2)),
+  align = c('center', rep('center', ncol(gl1_df2))),
+  line = list(width = 2, color = 'black'),
+  fill = list(color = "rgba(192, 192, 192, 0.7)"),
+  font = list(family = "Times New Roman", size = 12, color = "white")
+  ),
+  cells = list(
+    values = rbind(
+      rownames(gl1_df2), 
+      t(as.matrix(unname(gl1_df2)))
+    ),
+    align = c('left', rep('center', ncol(gl1_df2))),
+    line = list(color = "black", width = 2),
+    fill = list(color = c('rgb(235, 193, 238)', 'rgba(228, 222, 249, 0.65)')),
+    font = list(family = "Arial", size = 12, color = c("black")),
+    height = 40
+  ))
+gltable
+```
+
+Advanced Player Stats 
+==========================
+
+
+### This table displays Advanced Player Statisics for Game (12/31/2019)
+```{r}
+# Advanced Game Log 
+gltable <- plot_ly(
+  type = 'table',
+   columnwidth = c(0,800),
+  header = list(
+    values = c("<b>Players</b>", names(gl1adv2_df)),
+  align = c('center', rep('center', ncol(gl1adv2_df))),
+  line = list(width = 2, color = 'black'),
+  fill = list(color = '#bcbd22'),
+  font = list(family = "Times New Roman", size = 12, color = "white")
+  ),
+  cells = list(
+    values = rbind(
+      rownames(gl1adv2_df), 
+      t(as.matrix(unname(gl1adv2_df)))
+    ),
+    align = c('left', rep('center', ncol(gl1adv2_df))),
+    line = list(color = "black", width = 2),
+    fill = list(color = c('rgb(235, 193, 238)', 'rgba(228, 222, 249, 0.65)')),
+    font = list(family = "Arial", size = 12, color = c("black")),
+    height = 60
+  ))
+gltable
+```
+
+
+Advance Metrics (Part 1)
+==========================
+
+Column
+-----------------------------------
+
+```{r}
+g1test1 <-gl1adv_df %>% 
+ggplot(., aes(x = eFG, y = TSPer))+
+  geom_point(aes(color = PTS))+
+  facet_wrap(~Player)+
+  labs(title = "Player Shooting Efficency",
+       x = "Effective Field Goal %",
+       y = "True Shooting %")+
+    theme_minimal()+
+    theme(legend.position = "right", axis.text.x = element_text(angle = 45)) 
+ggplotly(g1test1)
+```
+
+
+```{r}
+g1test2 <-gl1adv_df %>% 
+ggplot(., aes(x = TOP, y = USG))+
+  geom_point(aes(color = Player))+
+  labs(title = "Player Turnover Rate",
+       x = "Turnover %",
+       y = "Usage")+
+    theme_minimal()+
+    theme(legend.position = "right", axis.text.x = element_text(angle = 45)) 
+ggplotly(g1test2)
+
+
+```
+
+Advance Metrics (Part 2)
+==========================
+
+Row 
+-----------------------------------
+
+```{r}
+g1test3 <-gl1adv_df %>% 
+ggplot(., aes(x = EFF, y = Player))+
+  geom_point(aes(color = FTR))+
+  labs(title = "Player Efficiency Rating",
+       x = "Player Efficiency",
+       y = " ")+
+    theme_minimal()+
+    theme(legend.position = "right", axis.text.x = element_text(angle = 45)) 
+ggplotly(g1test3)
+```
+
+```{r}
+g1test4 <-gl1adv_df %>% 
+ggplot(., aes(x = GmSc, y = USG))+
+  geom_point(aes(color = FGA))+
+  facet_wrap(~Player)+
+  labs(title = "Player Game Score by Usage ",
+       x = "Games Score",
+       y = "Usage")+
+    theme_minimal()+
+    theme(legend.position = "right", axis.text.x = element_text(angle = 45)) 
+ggplotly(g1test4)
+
+```
+
+Column
+-----------------------------------
+
+```{r}
+g1test5 <-gl1adv_df %>% 
+ggplot(., aes(x = PPP, y = Player))+
+  geom_point(aes(color = EFF))+
+  labs(title = "Points Per Possesion",
+       x = "PPP",
+       y = " ")+
+    theme_minimal()+
+    theme(legend.position = "right", axis.text.x = element_text(angle = 45)) 
+ggplotly(g1test5)
+```
