@@ -1,0 +1,671 @@
+---
+title: "raw_data"
+author: "AJ Fowler"
+date: "7/27/2020"
+output: word_document
+---
+```{r reading data}
+library(readxl)
+Razorsharks_Gamelog <- read_excel("~/Downloads/Rochester Razorsharks Gamelog.xlsx")
+View(Razorsharks_Gamelog)
+```
+
+```{r}
+# converting variables to intergers
+Razorsharks_Gamelog$FGA <- as.numeric(as.character(Razorsharks_Gamelog$FGA))
+ Razorsharks_Gamelog$FGM <- as.numeric(as.character(Razorsharks_Gamelog$FGM))
+Razorsharks_Gamelog$ThreeP <- as.numeric(as.character(Razorsharks_Gamelog$ThreeP))
+Razorsharks_Gamelog$ThreePA <- as.numeric(as.character(Razorsharks_Gamelog$ThreePA))
+Razorsharks_Gamelog$FT <- as.numeric(as.character(Razorsharks_Gamelog$FT))
+Razorsharks_Gamelog$FTA <- as.numeric(as.character(Razorsharks_Gamelog$FTA))
+Razorsharks_Gamelog$PTS <- as.numeric(as.character(Razorsharks_Gamelog$PTS))
+Razorsharks_Gamelog$TRB <- as.numeric(as.character(Razorsharks_Gamelog$TRB))
+Razorsharks_Gamelog$AST <- as.numeric(as.character(Razorsharks_Gamelog$AST))
+Razorsharks_Gamelog$PF <- as.numeric(as.character(Razorsharks_Gamelog$PF))
+Razorsharks_Gamelog$BLK <- as.numeric(as.character(Razorsharks_Gamelog$BLK))
+Razorsharks_Gamelog$STL <- as.numeric(as.character(Razorsharks_Gamelog$STL))
+Razorsharks_Gamelog$TO <- as.numeric(as.character(Razorsharks_Gamelog$TO))
+Razorsharks_Gamelog$MP <- as.numeric(as.character(Razorsharks_Gamelog$MP))
+# convert date column to date class
+Razorsharks_Gamelog$Dates <- as.Date(Razorsharks_Gamelog$Dates)
+
+```
+
+```{r}
+library(tidyverse)
+
+# Creating FGP, ThreePer, ThreeR, FTR, FTP, TSA, TSPer, eFG, TOP, POS, EFF, USG, GmSc, PPP and Team Varibles
+Razorsharks_Gamelog%>%
+  mutate(., FGP = FGM / FGA) %>%
+  mutate(., ThreePer = ThreeP / ThreePA) %>%
+  mutate(., FTP = FT / FTA) %>%
+  mutate(., TSA = FGA + 0.44 * FTA) %>%
+  mutate(., TSPer = PTS / (2 * TSA)) %>%
+  mutate(., eFG = (FGM + 0.5 * ThreeP) / FGA) %>%
+  mutate(., ThreeR = ThreePA / FGA ) %>%
+  mutate(., FTR = FT / FGA)%>%
+  mutate(., GmSc = (PTS +(0.4 *FGM)-(0.7 *FGA)-(0.4 *(FTA-FT))+(0.7 *ORB)+(0.3 *DRB)+STL+(0.7*AST)+(0.7 *BLK)-(0.4 *PF)-TO))%>%
+  mutate(., TOP = TO / (FGA + 0.44 * FTA + TO ))%>%
+  mutate(., EFF = (PTS + TRB + AST + BLK + STL)-((FGA-FGM)+(FTA-FT)+TO))%>%
+  mutate(., TmMP = sum(MP))%>%
+  mutate(., TmFGA = sum(FGA))%>%
+  mutate(., TmFTA = sum(FTA))%>%
+  mutate(., TmTO = sum(TO))%>%
+  mutate(., POS = 0.96 * ((FGA) + (TO) + 0.44 * (FTA) - (ORB))) %>%
+  mutate(., PPP = PTS / POS) %>%
+  mutate(., USG = 100 * ((FGA + 0.44 * FTA + TO) * (TmMP / 5)) / (MP * (TmFGA + 0.44 * TmFTA + TmTO))) -> gl_df
+
+# removing Na's
+gl_df <- gl_df %>%  
+  mutate_if(~ any(grep(pattern = "NaN", x = .)), function(x){ifelse(x == "NaN", 0, x)})
+
+# Converting Charters to Numerics
+gl_df$FGP <- as.numeric(as.character(gl_df$FGP))
+gl_df$ThreePer <- as.numeric(as.character(gl_df$ThreePer))
+gl_df$FTP <- as.numeric(as.character(gl_df$FTP))
+gl_df$TSPer <- as.numeric(as.character(gl_df$TSPer))
+gl_df$eFG <- as.numeric(as.character(gl_df$eFG))
+gl_df$ThreeR <- as.numeric(as.character(gl_df$ThreeR))
+gl_df$FTR <- as.numeric(as.character(gl_df$FTR))
+gl_df$TOP <- as.numeric(as.character(gl_df$TOP))
+gl_df$EFF <- as.numeric(as.character(gl_df$EFF))
+gl_df$GmSc <- as.numeric(as.character(gl_df$GmSc))
+gl_df$USG <- as.numeric(as.character(gl_df$USG))
+gl_df$POS <- as.numeric(as.character(gl_df$POS))
+gl_df$PPP <- as.numeric(as.character(gl_df$PPP))
+
+# remove TSA varible
+gl_df%>%
+  select(., -'TSA', -'TmFGA', -'TmFTA', -'TmTO', -'TmMP') -> gl_df
+
+# function that searches for all numerical variables and rounds them to the specified number of digits
+round_df <- function(df, digits) {
+  nums <- vapply(df, is.numeric, FUN.VALUE = logical(1))
+  df[,nums] <- round(df[,nums], digits = digits)
+  (df)
+}
+round_df(gl_df, digits=3) -> gl_df
+
+# Create indiviual Gamelogs
+gl_df%>%filter(., Dates == '2019-12-14') -> gl1_df
+gl_df%>%filter(., Dates == '2019-12-31') -> gl2_df
+gl_df%>%filter(., Dates == '2020-01-11') -> gl3_df
+gl_df%>%filter(., Dates == '2020-02-02') -> gl4_df
+gl_df%>%filter(., Dates == '2020-02-08') -> gl5_df
+gl_df%>%filter(., Dates == '2020-02-09') -> gl6_df
+
+# Create Player Gamelogs
+gl_df%>%filter(., Player == 'George Graham') -> george_df
+gl_df%>%filter(., Player == 'Devon Gavin') -> devon_df
+gl_df%>%filter(., Player == 'Tyler English') -> tyler_df
+gl_df%>%filter(., Player == 'Peach Dixon') -> peach_df
+gl_df%>%filter(., Player == 'Jarrell Reid') -> jarrell_df
+gl_df%>%filter(., Player == 'Aaron Vickers') -> aaron_df
+gl_df%>%filter(., Player == 'Steve White') -> steve_df
+gl_df%>%filter(., Player == 'Rodney Roberts') -> rodney_df
+gl_df%>%filter(., Player == 'Jamal Carter') -> jamal_df
+gl_df%>%filter(., Player == 'Zach Marcelline') -> zach_df
+gl_df%>%filter(., Player == 'Darrell Nelson') -> darrell_df
+gl_df%>%filter(., Player == 'Quadir Croston') -> quadir_df
+
+# Creating Saeson Average Table for players
+sznavg <- data.frame(Player = 'George Graham',
+                      PPG = NA,
+                      RPG = NA,
+                      APG = NA,
+                     FGP = NA,
+                      FTP = NA,
+                     FTR = NA,
+                      ThreePer = NA,
+                      ThreeR = NA,
+                     MPG = NA,
+                     BLK = NA,
+                      STL = NA,
+                      TO = NA,
+                     TOP = NA,
+                      TS = NA,
+                      eFG = NA,
+                     EFF = NA,
+                     GmSc = NA,
+                     USG = NA,
+                     POS = NA,
+                     PPP = NA)
+
+sznavg1 <- data.frame(Player = 'Devon Gavin',
+                      PPG = NA,
+                      RPG = NA,
+                      APG = NA,
+                      FGP = NA,
+                      FTP = NA,
+                      FTR = NA,
+                      ThreePer = NA,
+                      ThreeR = NA,
+                      MPG = NA,
+                      BLK = NA,
+                      STL = NA,
+                      TO = NA,
+                       TOP = NA,
+                      TS = NA,
+                      eFG = NA,
+                      EFF = NA,
+                      GmSc = NA,
+                      USG = NA,
+                      POS = NA,
+                     PPP = NA)
+
+sznavg2 <- data.frame(Player = 'Tyler English',
+                      PPG = NA,
+                      RPG = NA,
+                      APG = NA,
+                      FGP = NA,
+                      FTP = NA,
+                      FTR = NA,
+                      ThreePer = NA,
+                      ThreeR = NA,
+                      MPG = NA,
+                     BLK = NA,
+                      STL = NA,
+                      TO = NA,
+                      TOP = NA,
+                     TS = NA,
+                      eFG = NA,
+                     EFF = NA,
+                     GmSc = NA,
+                     USG = NA,
+                     POS = NA,
+                     PPP = NA)
+
+sznavg3 <- data.frame(Player = 'Peach Dixon',
+                      PPG = NA,
+                      RPG = NA,
+                      APG = NA,
+                      FGP = NA,
+                      FTP = NA,
+                      FTR = NA,
+                      ThreePer = NA,
+                      ThreeR = NA,
+                      MPG = NA,
+                      BLK = NA,
+                      STL = NA,
+                      TO = NA,
+                       TOP = NA,
+                      TS = NA,
+                      eFG = NA,
+                      EFF = NA,
+                      GmSc = NA,
+                      USG = NA,
+                      POS = NA,
+                     PPP = NA)
+
+sznavg4 <- data.frame(Player = 'Jarrell Reid',
+                      PPG = NA,
+                      RPG = NA,
+                      APG = NA,
+                      FGP = NA,
+                      FTP = NA,
+                      FTR = NA,
+                      ThreePer = NA,
+                      ThreeR = NA,
+                      MPG = NA,
+                     BLK = NA,
+                      STL = NA,
+                      TO = NA,
+                      TOP = NA,
+                     TS = NA,
+                      eFG = NA,
+                     EFF = NA,
+                     GmSc = NA,
+                     USG = NA,
+                     POS = NA,
+                     PPP = NA)
+
+sznavg5 <- data.frame(Player = 'Aaron Vickers',
+                      PPG = NA,
+                      RPG = NA,
+                      APG = NA,
+                      FGP = NA,
+                      FTP = NA,
+                      FTR = NA,
+                      ThreePer = NA,
+                      ThreeR = NA,
+                      MPG = NA,
+                      BLK = NA,
+                      STL = NA,
+                      TO = NA,
+                       TOP = NA,
+                      TS = NA,
+                      eFG = NA,
+                      EFF = NA,
+                      GmSc = NA,
+                      USG = NA,
+                      POS = NA,
+                     PPP = NA)
+
+sznavg6 <- data.frame(Player = 'Steve White',
+                      PPG = NA,
+                      RPG = NA,
+                      APG = NA,
+                      FGP = NA,
+                      FTP = NA,
+                      FTR = NA,
+                      ThreePer = NA,
+                      ThreeR = NA,
+                      MPG = NA,
+                     BLK = NA,
+                      STL = NA,
+                      TO = NA,
+                      TOP = NA,
+                     TS = NA,
+                      eFG = NA,
+                     EFF = NA,
+                     GmSc = NA,
+                     USG = NA,
+                     POS = NA,
+                     PPP = NA)
+
+sznavg7 <- data.frame(Player = 'Rodney Roberts',
+                      PPG = NA,
+                      RPG = NA,
+                      APG = NA,
+                      FGP = NA,
+                      FTP = NA,
+                      FTR = NA,
+                      ThreePer = NA,
+                      ThreeR = NA,
+                      MPG = NA,
+                      BLK = NA,
+                      STL = NA,
+                      TO = NA,
+                       TOP = NA,
+                      TS = NA,
+                      eFG = NA,
+                      EFF = NA,
+                      GmSc = NA,
+                      USG = NA,
+                      POS = NA,
+                     PPP = NA)
+
+sznavg8 <- data.frame(Player = 'Jamal Carter',
+                      PPG = NA,
+                      RPG = NA,
+                      APG = NA,
+                      FGP = NA,
+                      FTP = NA,
+                      FTR = NA,
+                      ThreePer = NA,
+                      ThreeR = NA,
+                      MPG = NA,
+                     BLK = NA,
+                      STL = NA,
+                      TO = NA,
+                      TOP = NA,
+                     TS = NA,
+                      eFG = NA,
+                     EFF = NA,
+                     GmSc = NA,
+                     USG = NA,
+                     POS = NA,
+                     PPP = NA)
+
+sznavg9 <- data.frame(Player = 'Zach Marcelline',
+                      PPG = NA,
+                      RPG = NA,
+                      APG = NA,
+                      FGP = NA,
+                      FTP = NA,
+                      FTR = NA,
+                      ThreePer = NA,
+                      ThreeR = NA,
+                      MPG = NA,
+                      BLK = NA,
+                      STL = NA,
+                      TO = NA,
+                       TOP = NA,
+                      TS = NA,
+                      eFG = NA,
+                      EFF = NA,
+                      GmSc = NA,
+                      USG = NA,
+                      POS = NA,
+                     PPP = NA)
+
+sznavg10 <- data.frame(Player = 'Darrell Nelson',
+                      PPG = NA,
+                      RPG = NA,
+                      APG = NA,
+                      FGP = NA,
+                      FTP = NA,
+                      FTR = NA,
+                      ThreePer = NA,
+                      ThreeR = NA,
+                      MPG = NA,
+                      BLK = NA,
+                      STL = NA,
+                      TO = NA,
+                       TOP = NA,
+                      TS = NA,
+                      eFG = NA,
+                      EFF = NA,
+                      GmSc = NA,
+                      USG = NA,
+                      POS = NA,
+                     PPP = NA)
+
+sznavg11 <- data.frame(Player = 'Quadir Croston',
+                      PPG = NA,
+                      RPG = NA,
+                      APG = NA,
+                      FGP = NA,
+                      FTP = NA,
+                      FTR = NA,
+                      ThreePer = NA,
+                      ThreeR = NA,
+                      MPG = NA,
+                     BLK = NA,
+                      STL = NA,
+                      TO = NA,
+                      TOP = NA,
+                     TS = NA,
+                      eFG = NA,
+                     EFF = NA,
+                     GmSc = NA,
+                     USG = NA,
+                     POS = NA,
+                     PPP = NA)
+
+# Populating Tables with averages
+sznavg$PPG <- mean(george_df$PTS)
+sznavg$RPG <- mean(george_df$TRB)
+sznavg$APG <- mean(george_df$AST)
+sznavg$FGP <- mean(george_df$FGP)
+sznavg$FTP <- mean(george_df$FTP)
+sznavg$FTR <- mean(george_df$FTR)
+sznavg$ThreePer <- mean(george_df$ThreePer)
+sznavg$ThreeR <- mean(george_df$ThreeR)
+sznavg$MPG <- mean(george_df$MP)
+sznavg$STL <- mean(george_df$STL)
+sznavg$BLK <- mean(george_df$BLK)
+sznavg$TO <- mean(george_df$TO)
+sznavg$TOP <- mean(george_df$TOP)
+sznavg$TS <- mean(george_df$TSPer)
+sznavg$eFG <- mean(george_df$eFG)
+sznavg$EFF <- mean(george_df$EFF)
+sznavg$GmSc <- mean(george_df$GmSc)
+sznavg$USG <- mean(george_df$USG)
+sznavg$POS <- mean(george_df$POS)
+sznavg$PPP <- mean(george_df$PPP)
+
+sznavg1$PPG <- mean(devon_df$PTS)
+sznavg1$RPG <- mean(devon_df$TRB)
+sznavg1$APG <- mean(devon_df$AST)
+sznavg1$FGP <- mean(devon_df$FGP)
+sznavg1$FTP <- mean(devon_df$FTP)
+sznavg1$FTR <- mean(devon_df$FTR)
+sznavg1$ThreePer <- mean(devon_df$ThreePer)
+sznavg1$ThreeR <- mean(devon_df$ThreeR)
+sznavg1$MPG <- mean(devon_df$MP)
+sznavg1$STL <- mean(devon_df$STL)
+sznavg1$BLK <- mean(devon_df$BLK)
+sznavg1$TO <- mean(devon_df$TO)
+sznavg1$TOP <- mean(devon_df$TOP)
+sznavg1$TS <- mean(devon_df$TSPer)
+sznavg1$eFG <- mean(devon_df$eFG)
+sznavg1$EFF <- mean(devon_df$EFF)
+sznavg1$GmSc <- mean(devon_df$GmSc)
+sznavg1$USG <- mean(devon_df$USG)
+sznavg1$POS <- mean(devon_df$POS)
+sznavg1$PPP <- mean(devon_df$PPP)
+
+sznavg2$PPG <- mean(tyler_df$PTS)
+sznavg2$RPG <- mean(tyler_df$TRB)
+sznavg2$APG <- mean(tyler_df$AST)
+sznavg2$FGP <- mean(tyler_df$FGP)
+sznavg2$FTP <- mean(tyler_df$FTP)
+sznavg2$FTR <- mean(tyler_df$FTR)
+sznavg2$ThreePer <- mean(tyler_df$ThreePer)
+sznavg2$ThreeR <- mean(tyler_df$ThreeR)
+sznavg2$MPG <- mean(tyler_df$MP)
+sznavg2$STL <- mean(tyler_df$STL)
+sznavg2$BLK <- mean(tyler_df$BLK)
+sznavg2$TO <- mean(tyler_df$TO)
+sznavg2$TOP <- mean(tyler_df$TOP)
+sznavg2$TS <- mean(tyler_df$TSPer)
+sznavg2$eFG <- mean(tyler_df$eFG)
+sznavg2$EFF <- mean(tyler_df$EFF)
+sznavg2$GmSc <- mean(tyler_df$GmSc)
+sznavg2$USG <- mean(tyler_df$USG)
+sznavg2$POS <- mean(tyler_df$POS)
+sznavg2$PPP <- mean(tyler_df$PPP)
+
+sznavg3$PPG <- mean(peach_df$PTS)
+sznavg3$RPG <- mean(peach_df$TRB)
+sznavg3$APG <- mean(peach_df$AST)
+sznavg3$FGP <- mean(peach_df$FGP)
+sznavg3$FTP <- mean(peach_df$FTP)
+sznavg3$FTR <- mean(peach_df$FTR)
+sznavg3$ThreePer <- mean(peach_df$ThreePer)
+sznavg3$ThreeR <- mean(peach_df$ThreeR)
+sznavg3$MPG <- mean(peach_df$MP)
+sznavg3$STL <- mean(peach_df$STL)
+sznavg3$BLK <- mean(peach_df$BLK)
+sznavg3$TO <- mean(peach_df$TO)
+sznavg3$TOP <- mean(peach_df$TOP)
+sznavg3$TS <- mean(peach_df$TSPer)
+sznavg3$eFG <- mean(peach_df$eFG)
+sznavg3$EFF <- mean(peach_df$EFF)
+sznavg3$GmSc <- mean(peach_df$GmSc)
+sznavg3$USG <- mean(peach_df$USG)
+sznavg3$POS <- mean(peach_df$POS)
+sznavg3$PPP <- mean(peach_df$PPP)
+
+sznavg4$PPG <- mean(jarrell_df$PTS)
+sznavg4$RPG <- mean(jarrell_df$TRB)
+sznavg4$APG <- mean(jarrell_df$AST)
+sznavg4$FGP <- mean(jarrell_df$FGP)
+sznavg4$FTP <- mean(jarrell_df$FTP)
+sznavg4$FTR <- mean(jarrell_df$FTR)
+sznavg4$ThreePer <- mean(jarrell_df$ThreePer)
+sznavg4$ThreeR <- mean(jarrell_df$ThreeR)
+sznavg4$MPG <- mean(jarrell_df$MP)
+sznavg4$STL <- mean(jarrell_df$STL)
+sznavg4$BLK <- mean(jarrell_df$BLK)
+sznavg4$TO <- mean(jarrell_df$TO)
+sznavg4$TOP <- mean(jarrell_df$TOP)
+sznavg4$TS <- mean(jarrell_df$TSPer)
+sznavg4$eFG <- mean(jarrell_df$eFG)
+sznavg4$EFF <- mean(jarrell_df$EFF)
+sznavg4$GmSc <- mean(jarrell_df$GmSc)
+sznavg4$USG <- mean(jarrell_df$USG)
+sznavg4$POS <- mean(jarrell_df$POS)
+sznavg4$PPP <- mean(jarrell_df$PPP)
+
+sznavg5$PPG <- mean(aaron_df$PTS)
+sznavg5$RPG <- mean(aaron_df$TRB)
+sznavg5$APG <- mean(aaron_df$AST)
+sznavg5$FGP <- mean(aaron_df$FGP)
+sznavg5$FTP <- mean(aaron_df$FTP)
+sznavg5$FTR <- mean(aaron_df$FTR)
+sznavg5$ThreePer <- mean(aaron_df$ThreePer)
+sznavg5$ThreeR <- mean(aaron_df$ThreeR)
+sznavg5$MPG <- mean(aaron_df$MP)
+sznavg5$STL <- mean(aaron_df$STL)
+sznavg5$BLK <- mean(aaron_df$BLK)
+sznavg5$TO <- mean(aaron_df$TO)
+sznavg5$TOP <- mean(aaron_df$TOP)
+sznavg5$TS <- mean(aaron_df$TSPer)
+sznavg5$eFG <- mean(aaron_df$eFG)
+sznavg5$EFF <- mean(aaron_df$EFF)
+sznavg5$GmSc <- mean(aaron_df$GmSc)
+sznavg5$USG <- mean(aaron_df$USG)
+sznavg5$POS <- mean(aaron_df$POS)
+sznavg5$PPP <- mean(aaron_df$PPP)
+
+sznavg6$PPG <- mean(steve_df$PTS)
+sznavg6$RPG <- mean(steve_df$TRB)
+sznavg6$APG <- mean(steve_df$AST)
+sznavg6$FGP <- mean(steve_df$FGP)
+sznavg6$FTP <- mean(steve_df$FTP)
+sznavg6$FTR <- mean(steve_df$FTR)
+sznavg6$ThreePer <- mean(steve_df$ThreePer)
+sznavg6$ThreeR <- mean(steve_df$ThreeR)
+sznavg6$MPG <- mean(steve_df$MP)
+sznavg6$STL <- mean(steve_df$STL)
+sznavg6$BLK <- mean(steve_df$BLK)
+sznavg6$TO <- mean(steve_df$TO)
+sznavg6$TOP <- mean(steve_df$TOP)
+sznavg6$TS <- mean(steve_df$TSPer)
+sznavg6$eFG <- mean(steve_df$eFG)
+sznavg6$EFF <- mean(steve_df$EFF)
+sznavg6$GmSc <- mean(steve_df$GmSc)
+sznavg6$USG <- mean(steve_df$USG)
+sznavg6$POS <- mean(steve_df$POS)
+sznavg6$PPP <- mean(steve_df$PPP)
+
+sznavg7$PPG <- mean(rodney_df$PTS)
+sznavg7$RPG <- mean(rodney_df$TRB)
+sznavg7$APG <- mean(rodney_df$AST)
+sznavg7$FGP <- mean(rodney_df$FGP)
+sznavg7$FTP <- mean(rodney_df$FTP)
+sznavg7$FTR <- mean(rodney_df$FTR)
+sznavg7$ThreePer <- mean(rodney_df$ThreePer)
+sznavg7$ThreeR <- mean(rodney_df$ThreeR)
+sznavg7$MPG <- mean(rodney_df$MP)
+sznavg7$STL <- mean(rodney_df$STL)
+sznavg7$BLK <- mean(rodney_df$BLK)
+sznavg7$TO <- mean(rodney_df$TO)
+sznavg7$TOP <- mean(rodney_df$TOP)
+sznavg7$TS <- mean(rodney_df$TSPer)
+sznavg7$eFG <- mean(rodney_df$eFG)
+sznavg7$EFF <- mean(rodney_df$EFF)
+sznavg7$GmSc <- mean(rodney_df$GmSc)
+sznavg7$USG <- mean(rodney_df$USG)
+sznavg7$POS <- mean(rodney_df$POS)
+sznavg7$PPP <- mean(rodney_df$PPP)
+
+sznavg8$PPG <- mean(jamal_df$PTS)
+sznavg8$RPG <- mean(jamal_df$TRB)
+sznavg8$APG <- mean(jamal_df$AST)
+sznavg8$FGP <- mean(jamal_df$FGP)
+sznavg8$FTP <- mean(jamal_df$FTP)
+sznavg8$FTR <- mean(jamal_df$FTR)
+sznavg8$ThreePer <- mean(jamal_df$ThreePer)
+sznavg8$ThreeR <- mean(jamal_df$ThreeR)
+sznavg8$MPG <- mean(jamal_df$MP)
+sznavg8$STL <- mean(jamal_df$STL)
+sznavg8$BLK <- mean(jamal_df$BLK)
+sznavg8$TO <- mean(jamal_df$TO)
+sznavg8$TOP <- mean(jamal_df$TOP)
+sznavg8$TS <- mean(jamal_df$TSPer)
+sznavg8$eFG <- mean(jamal_df$eFG)
+sznavg8$EFF <- mean(jamal_df$EFF)
+sznavg8$GmSc <- mean(jamal_df$GmSc)
+sznavg8$USG <- mean(jamal_df$USG)
+sznavg8$POS <- mean(jamal_df$POS)
+sznavg8$PPP <- mean(jamal_df$PPP)
+
+sznavg9$PPG <- mean(zach_df$PTS)
+sznavg9$RPG <- mean(zach_df$TRB)
+sznavg9$APG <- mean(zach_df$AST)
+sznavg9$FGP <- mean(zach_df$FGP)
+sznavg9$FTP <- mean(zach_df$FTP)
+sznavg9$FTR <- mean(zach_df$FTR)
+sznavg9$ThreePer <- mean(zach_df$ThreePer)
+sznavg9$ThreeR <- mean(zach_df$ThreeR)
+sznavg9$MPG <- mean(zach_df$MP)
+sznavg9$STL <- mean(zach_df$STL)
+sznavg9$BLK <- mean(zach_df$BLK)
+sznavg9$TO <- mean(zach_df$TO)
+sznavg9$TOP <- mean(zach_df$TOP)
+sznavg9$TS <- mean(zach_df$TSPer)
+sznavg9$eFG <- mean(zach_df$eFG)
+sznavg9$EFF <- mean(zach_df$EFF)
+sznavg9$GmSc <- mean(zach_df$GmSc)
+sznavg9$USG <- mean(zach_df$USG)
+sznavg9$POS <- mean(zach_df$POS)
+sznavg9$PPP <- mean(zach_df$PPP)
+
+sznavg10$PPG <- mean(darrell_df$PTS)
+sznavg10$RPG <- mean(darrell_df$TRB)
+sznavg10$APG <- mean(darrell_df$AST)
+sznavg10$FGP <- mean(darrell_df$FGP)
+sznavg10$FTP <- mean(darrell_df$FTP)
+sznavg10$FTR <- mean(darrell_df$FTR)
+sznavg10$ThreePer <- mean(darrell_df$ThreePer)
+sznavg10$ThreeR <- mean(darrell_df$ThreeR)
+sznavg10$MPG <- mean(darrell_df$MP)
+sznavg10$STL <- mean(darrell_df$STL)
+sznavg10$BLK <- mean(darrell_df$BLK)
+sznavg10$TO <- mean(darrell_df$TO)
+sznavg10$TOP <- mean(darrell_df$TOP)
+sznavg10$TS <- mean(darrell_df$TSPer)
+sznavg10$eFG <- mean(darrell_df$eFG)
+sznavg10$EFF <- mean(darrell_df$EFF)
+sznavg10$GmSc <- mean(darrell_df$GmSc)
+sznavg10$USG <- mean(darrell_df$USG)
+sznavg10$POS <- mean(darrell_df$POS)
+sznavg10$PPP <- mean(darrell_df$PPP)
+
+sznavg11$PPG <- mean(quadir_df$PTS)
+sznavg11$RPG <- mean(quadir_df$TRB)
+sznavg11$APG <- mean(quadir_df$AST)
+sznavg11$FGP <- mean(quadir_df$FGP)
+sznavg11$FTP <- mean(quadir_df$FTP)
+sznavg11$FTR <- mean(quadir_df$FTR)
+sznavg11$ThreePer <- mean(quadir_df$ThreePer)
+sznavg11$ThreeR <- mean(quadir_df$ThreeR)
+sznavg11$MPG <- mean(quadir_df$MP)
+sznavg11$STL <- mean(quadir_df$STL)
+sznavg11$BLK <- mean(quadir_df$BLK)
+sznavg11$TO <- mean(quadir_df$TO)
+sznavg11$TOP <- mean(quadir_df$TOP)
+sznavg11$TS <- mean(quadir_df$TSPer)
+sznavg11$eFG <- mean(quadir_df$eFG)
+sznavg11$EFF <- mean(quadir_df$EFF)
+sznavg11$GmSc <- mean(quadir_df$GmSc)
+sznavg11$USG <- mean(quadir_df$USG)
+sznavg11$POS <- mean(quadir_df$POS)
+sznavg11$PPP <- mean(quadir_df$PPP)
+
+# combinding tables
+bind_rows(sznavg, sznavg1, sznavg2, sznavg3, sznavg4, sznavg5, sznavg6, sznavg7, sznavg8, sznavg9, sznavg10, sznavg11) -> sznavg_df
+
+format(sznavg_df, digits = 3) -> sznavg_df
+
+# Converting Charters to Numerics
+sznavg_df$PPG <- as.numeric(as.character(sznavg_df$PPG))
+sznavg_df$RPG <- as.numeric(as.character(sznavg_df$RPG))
+sznavg_df$APG <- as.numeric(as.character(sznavg_df$APG))
+sznavg_df$FTR <- as.numeric(as.character(sznavg_df$FTR))
+sznavg_df$ThreePer <- as.numeric(as.character(sznavg_df$ThreePer))
+sznavg_df$MPG <- as.numeric(as.character(sznavg_df$MPG))
+sznavg_df$BLK <- as.numeric(as.character(sznavg_df$BLK))
+sznavg_df$STL <- as.numeric(as.character(sznavg_df$STL))
+sznavg_df$TO <- as.numeric(as.character(sznavg_df$TO))
+sznavg_df$TOP <- as.numeric(as.character(sznavg_df$TOP))
+sznavg_df$TS <- as.numeric(as.character(sznavg_df$TS))
+sznavg_df$eFG <- as.numeric(as.character(sznavg_df$eFG))
+sznavg_df$EFF <- as.numeric(as.character(sznavg_df$EFF))
+sznavg_df$GmSc <- as.numeric(as.character(sznavg_df$GmSc))
+sznavg_df$USG <- as.numeric(as.character(sznavg_df$USG))
+sznavg_df$POS <- as.numeric(as.character(sznavg_df$POS))
+sznavg_df$PPP <- as.numeric(as.character(sznavg_df$PPP))
+
+```
+
+```{r saving data}
+# This saves the data in a rda file for later recall
+save(sznavg_df, file = "Data/sznavg_df.rda") # Season Average Table
+save(tyler_df, file = "Data/tyler_df.rda") # Tyler English Game Log
+save(sznavg2, file = "Data/sznavg2.rda") # Tyler English Season Avg Table
+save(peach_df, file = "Data/peach_df.rda") # Peach Dixon Game log
+save(sznavg3, file = "Data/sznavg3.rda") # Peach Dixon Season Avg Table
+save(devon_df, file = "Data/devon_df.rda") # Devon Gavin Game Log
+save(sznavg1, file = "Data/sznavg1.rda") # Devon Gavin Season Avg Table
+save(gl_df, file = "Data/gl_df.rda") # Full Season Game Log
+save(gl1_df, file = "Data/gl1_df.rda") # Game Log (12/14/2019)
+save(gl2_df, file = "Data/gl2_df.rda") # Game Log (12/31/2019)
+save(gl3_df, file = "Data/gl3_df.rda") # Game Log (1/11/2020)
+save(gl4_df, file = "Data/gl4_df.rda") # Game Log (02/02/2020)
+save(gl5_df, file = "Data/gl5_df.rda") # Game Log (02/08/2020)
+save(gl6_df, file = "Data/gl6_df.rda") # Game Log (02/09/2020)
+```
