@@ -1,0 +1,345 @@
+---
+title: "GDAT_Capstone"
+author: "AJ Fowler"
+date: "8/12/2020"
+output: 
+  html_document:
+    toc: TRUE
+    toc_depth: 2
+    toc_float: TRUE
+    number_sections: TRUE
+---
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# Installations from CRAN
+c("data.table",     # Fast data reading; shift()
+  "dtplyr",         # dplyr done with data.table
+  "forecast",       # forecasting
+  "here",           # Better folder structure
+  "MASS",           # fitdistr()
+  "MTS",            # Multivariate time series
+  "readr",
+  "readxl",
+  "ROSE",
+  "ISLR",
+  "MASS",
+  "car",
+  "caret",
+  "splines",
+  "plotly",         # For 3-d and interactive plots
+  "tidyverse",      # For data manipulation
+  "tseries",        # Some time series functions
+  "xts",            # More time series functions
+  "zoo"             # Still more time series functions
+  ) -> package_names  
+
+for(package_name in package_names) {
+  if(!is.element(package_name, installed.packages()[,1])) {
+     install.packages(package_name,
+                      repos = "http://cran.mtu.edu/")
+  }
+  library(package_name, character.only=TRUE,
+          quietly=TRUE,verbose=FALSE)
+}
+
+# Installations from devtools. Because of folder structure on GitHub,
+#  these must be done individually
+if(!is.element("tsdl", installed.packages()[,1])) {
+  devtools::install_github("FinYang/tsdl")  # Everything else is on CRAN
+}
+library(tsdl)
+
+rm(list=c("package_name", "package_names"))
+
+options(show.signif.stars = FALSE)
+
+set_here()
+
+as.integer(Sys.time()) %% 100000 -> time_seed
+set.seed(time_seed)
+```
+
+```{r info}
+time_seed           # So the seed is available for replication
+sessionInfo()       # Information about all the packages and versions
+Sys.time()          # So we have a record of when this was knit
+```
+
+
+## Section I. Introduction
+
+# For this capstone I applied my data science skills to real world problems in the form of a statistics and game analytics internship with the Rochester Razorsharks. During the season, that was uprbulty ended due to COVID-19, I provided game to game statistical reports for coaches, media and PLB staff. In addition this I performed regression analysis to find what are the factors in win percentage on a season level, and  points scored a game to game level. I believe fatigue will have a major impact on these things as load management is becoming more prominent in sports today. As discussed in the article “Exploring the Science Behind Resting Athletes” by Joe Clubb, “Sportsmen and women often have punishing travel and sleep schedules to contend with as well as the physical and mental demands of their specific sport. On top of this, although sometimes forgotten, are the “normal” stresses that we all have to contend with in life (career pressures, relationships, crying newborns, the school run etc.)”. Because of this fatigue plays a major role in wins and loss because it affects a team's ability to play at maximum strength.
+
+# In a perfect world I would have willing player participants in answering survey questions like what was there at night like the day before, how many adult beverages they had, when they went to bed, if they ate breakfast, etc and every game to aggregate overall team fatigue. Since the honesty of the players will be question due to the nature of the survey it will not be realistic to include I aggregated team fatigue in another way. The fatigue variable like percent starters play(or Usage); this variable is interesting because we can judge whether or not playing “impact players” more or less leads to winning. To also further capture fatigue I will have to create a categorical variable of the level of intensity of practice before games based on the coach's opinion. The coach's input is important because he sets the level of intensity of practice so if I were to report when you have a more intense practice before a game you have a better chance of winning, he will have a better understanding. In addition to that data analysis, the coach is also interested in optimizing play design which I will be caluting passes, cuts and time of possession. The coaches main concern was data visulations on a game to game bases and on the season level the analysis they were intrested in were factors on winning on how the indivual players attributed to that, so alot of this project focused on those aspects.
+
+## Section II. Game Analysis
+
+# For the game to game analysis I provied the coach statiscal dashboards, using Flex Dashboard, after  each game that included plots and some advanced stats. For Data Collection, during the games two other stat keepers and I kept track of the game statistics in an app called 'Easy Stats for Basketball'. The app was limited in terms of what stats we were actually able to collect, but was mandiated by the team, so I had to create alot of the advanced statics used. Dissapointly the app also didnt allow for any shot tracking data to be collected so I wasnt able to create shot charts and that is an aspect that is missing for the data visulzation provied to the coaches.
+
+# Dispite the lack of statsical tools provied, for data wrangling I had to create varibles for analysis. The intial varibles I had to create were simple and inclued Field Goal%, 3Point%, Free Throw%. These were simplimly caluated and are pretty self intuivtve. I also created 3 Point Rate and Free Throw Rate varibles to describe how often a player is shooting threes and how often a player is getting to the line. Although simple, this was an important part of the analysis that the coaches were intrested in. The coaches always wanted more threes and more free throws so when players were on the lower scale of spectrum in terms of there rate they knew what needed to be done. After the more basic statisics I then created what are called "Advanced Statiscs in Basketball. This stats inclued Treue Shooting Attemps which are the and are nessiser in calculating True shooting percent. True shotting percent is a mesure of shooting effciency that takes into account field goals, 3 point field goals, and free throws. Another advanced stat that mesuares shooting efficiency I calcuated was effective feild goal percantage which is a statistic that adjust for the fact that a 3 point field goal is worth one more point than a 2 point field goal. Both shooting efficiency varibles are important as they give a more accutare represntation of shooting as aposed to just using free throw percent and 3 point percent. After calculating the shooting varibles I started to create more advanced stats. I created a Posseisions varible, this varible estimates possesions based on team staistics and is important when calcuating other advanced varibles. Another advance varible was Efficenicy, and this is a composite statisic and is used as a tool to calute the overall vaule of a player. Usage was also caluted and is an estimate of the percentage of team plays used by a player while he was on the floor. Usage was an important to calute as it can be used to put a box score in context. For example if a player has a high turnover percentage and a high usage a coach might use the player less in his roation. Game Score was another varible created that measures a player productictity. The scale is similar to that of points scored, (40 is an outstanding performance, 10 is an average performance).
+```{r gamelogdata}
+load("~/Desktop/Capstone/Data/gl1_df.rda") # (12/14/19) Game Log
+load("~/Desktop/Capstone/Data/gl2_df.rda") # (12/31/19) Game Log
+load("~/Desktop/Capstone/Data/gl3_df.rda") # (1/11/20) Game Log
+load("~/Desktop/Capstone/Data/gl4_df.rda") # (2/2/20) Game Log
+load("~/Desktop/Capstone/Data/gl5_df.rda") # (2/8/20) Game Log
+load("~/Desktop/Capstone/Data/gl6_df.rda") # (2/9/20) Game Log
+
+head(gl1_df)
+head(gl2_df)
+head(gl3_df)
+head(gl4_df)
+head(gl5_df)
+head(gl6_df)
+```
+## Section III. Full Season Analysis
+
+# After I had all collected the gamelog data from each game I then created a season average table for the season. In terms of analysis it is not the most useful but it certainly give a good overview of how players permformed of the course of those games.
+
+# The first task I was handed was to determine what caused winning or how this team won games. Dean Oliver in his book, Basketball on Paper, attempted to provied a framework for a question and found four important strategies that relate to the succes of baskebtall. The four factors are pretty intuitvite as they are essetnail, score efficiently, protect the ball, rebound the ball, and get the freethrow line. in his anaylsis he calculated; Shooting(40%), Turnovers(25%), Rebounding(20%), Free Throws(15%). Each of the games recored the Razorsharks won, but they were all by a different margin, so for a way of comparision I will use the 4 facotrs and compare how the team faired each game. Shooting will be represented by effective field goal % as it is a estimate of efficicent shooting. Turnover % will be used for turnovers. Rebounding will be broken up into two catorgoies Offensive rebound percentage and Defensive reebounding %. Free throw will be represented by Free Throw rate instead of the percentage becuase the rate you go to the freethrow is acatually somehting as a team thats easier to improve over the actaul percentage. As you can see these facotrs could be described in mutplies ways and I tackle in differnt ways. 
+```{r fullgamelog_season_data}
+load("~/Desktop/Capstone/Data/gl_df.rda") # Full Season Game Log
+load("~/Desktop/Capstone/Data/sznavg_df.rda") # Season Average Table
+```
+
+```{r}
+head(gl_df) # This shows some of the gamelog data from the 2020 season
+view(sznavg_df) # This is the season average table for the players in 2020 season
+
+## Model Fitting and Analysis
+
+# Creating Team Varibles for Each Game Log
+gl1_df%>%
+mutate(., Dates) %>%
+ mutate(., TmMP = sum(MP))%>%
+  mutate(., TmDRB = sum(DRB))%>%
+  mutate(., TmORB = sum(ORB))%>%
+  mutate(., TmEFG = sum(eFG)) %>%
+  mutate(., TmFTR = sum(FTR))%>%
+  mutate(., TmTOP = sum(TOP))%>%
+select(., -"Player", -"MP", -"PTS",-"DRB",-"ORB",-"AST",-"STL",-"BLK",-"TO",-"PF",-"FGM",-"FGA",-"ThreePer",-"FTP",-"TSPer",-"eFG",-"FTR",-"GmSc",-"USG",-"EFF",-"TRB",-"ThreeP",-"ThreePA",-"FT",-"FTA",-"FGP",-"ThreeR",-"TOP",-"POS",-"PPP")-> Tmgl1
+gl2_df%>%
+mutate(., Dates) %>%
+ mutate(., TmMP = sum(MP))%>%
+  mutate(., TmDRB = sum(DRB))%>%
+  mutate(., TmORB = sum(ORB))%>%
+  mutate(., TmEFG = sum(eFG)) %>%
+  mutate(., TmFTR = sum(FTR))%>%
+  mutate(., TmTOP = sum(TOP))%>%
+ select(., -"Player", -"MP", -"PTS",-"DRB",-"ORB",-"AST",-"STL",-"BLK",-"TO",-"PF",-"FGM",-"FGA",-"ThreePer",-"FTP",-"TSPer",-"eFG",-"FTR",-"GmSc",-"USG",-"EFF",-"TRB",-"ThreeP",-"ThreePA",-"FT",-"FTA",-"FGP",-"ThreeR",-"TOP",-"POS",-"PPP")-> Tmgl2
+gl3_df%>%
+mutate(., Dates) %>%
+ mutate(., TmMP = sum(MP))%>%
+  mutate(., TmDRB = sum(DRB))%>%
+  mutate(., TmORB = sum(ORB))%>%
+  mutate(., TmEFG = sum(eFG)) %>%
+  mutate(., TmFTR = sum(FTR))%>%
+  mutate(., TmTOP = sum(TOP))%>%
+ select(., -"Player", -"MP", -"PTS",-"DRB",-"ORB",-"AST",-"STL",-"BLK",-"TO",-"PF",-"FGM",-"FGA",-"ThreePer",-"FTP",-"TSPer",-"eFG",-"FTR",-"GmSc",-"USG",-"EFF",-"TRB",-"ThreeP",-"ThreePA",-"FT",-"FTA",-"FGP",-"ThreeR",-"TOP",-"POS",-"PPP")-> Tmgl3
+gl4_df%>%
+mutate(., Dates) %>%
+ mutate(., TmMP = sum(MP))%>%
+  mutate(., TmDRB = sum(DRB))%>%
+  mutate(., TmORB = sum(ORB))%>%
+  mutate(., TmEFG = sum(eFG)) %>%
+  mutate(., TmFTR = sum(FTR))%>%
+  mutate(., TmTOP = sum(TOP))%>%
+select(., -"Player", -"MP", -"PTS",-"DRB",-"ORB",-"AST",-"STL",-"BLK",-"TO",-"PF",-"FGM",-"FGA",-"ThreePer",-"FTP",-"TSPer",-"eFG",-"FTR",-"GmSc",-"USG",-"EFF",-"TRB",-"ThreeP",-"ThreePA",-"FT",-"FTA",-"FGP",-"ThreeR",-"TOP",-"POS",-"PPP")-> Tmgl4
+gl5_df%>%
+mutate(., Dates) %>%
+ mutate(., TmMP = sum(MP))%>%
+  mutate(., TmDRB = sum(DRB))%>%
+  mutate(., TmORB = sum(ORB))%>%
+  mutate(., TmEFG = sum(eFG)) %>%
+  mutate(., TmFTR = sum(FTR))%>%
+  mutate(., TmTOP = sum(TOP))%>%
+select(., -"Player", -"MP", -"PTS",-"DRB",-"ORB",-"AST",-"STL",-"BLK",-"TO",-"PF",-"FGM",-"FGA",-"ThreePer",-"FTP",-"TSPer",-"eFG",-"FTR",-"GmSc",-"USG",-"EFF",-"TRB",-"ThreeP",-"ThreePA",-"FT",-"FTA",-"FGP",-"ThreeR",-"TOP",-"POS",-"PPP")-> Tmgl5
+gl6_df%>%
+mutate(., Dates) %>%
+ mutate(., TmMP = sum(MP))%>%
+  mutate(., TmDRB = sum(DRB))%>%
+  mutate(., TmORB = sum(ORB))%>%
+  mutate(., TmEFG = sum(eFG)) %>%
+  mutate(., TmFTR = sum(FTR))%>%
+  mutate(., TmTOP = sum(TOP))%>%
+select(., -"Player", -"MP", -"PTS",-"DRB",-"ORB",-"AST",-"STL",-"BLK",-"TO",-"PF",-"FGM",-"FGA",-"ThreePer",-"FTP",-"TSPer",-"eFG",-"FTR",-"GmSc",-"USG",-"EFF",-"TRB",-"ThreeP",-"ThreePA",-"FT",-"FTA",-"FGP",-"ThreeR",-"TOP",-"POS",-"PPP")-> Tmgl6
+ 
+# Reading data
+library(readxl)
+Razorsharks_Teamlog <- read_excel("~/Downloads/Rochester Razorsharks Team Data.xlsx")
+
+# converting variables
+# Razorsharks_Teamlog$MOV <- as.numeric(as.character(Razorsharks_Gamelog$MOV))
+Razorsharks_Teamlog$Fatigue <-
+factor(Razorsharks_Teamlog$Fatigue)
+
+Tmgl1[-c(2, 3, 4, 5, 6, 7, 8, 9, 10, 11,12), ] -> Tmgl1
+Tmgl2[-c(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12), ] -> Tmgl2
+Tmgl3[-c(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12), ] -> Tmgl3
+Tmgl4[-c(2, 3, 4, 5, 6, 7, 8, 9, 10, 11), ] -> Tmgl4
+Tmgl5[-c(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12), ] -> Tmgl5
+Tmgl6[-c(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12), ] -> Tmgl6
+
+bind_rows(Tmgl1, Tmgl2 , Tmgl3, Tmgl4, Tmgl5, Tmgl6) -> Tmgl
+
+full_join(Razorsharks_Teamlog, Tmgl, by = "Dates") -> fullTmgl
+
+fullTmgl[1,] -> tmgl1
+fullTmgl[2,] -> tmgl2
+fullTmgl[3,] -> tmgl3
+fullTmgl[4,] -> tmgl4
+fullTmgl[5,] -> tmgl5
+fullTmgl[6,] -> tmgl6
+
+```
+
+# After comparing the 4 factors from each game and comparing how it effected the margin of victory I wanted to test what specfic factors for this team actually effect winning the most using OLS Regression and KNN.
+
+```{r}
+# Regression
+reg1=lm(MOV~TmEFG+TmORB+TmFTR+TmTOP,data=tmgl1)
+brief(reg1)
+reg2=lm(MOV~TmEFG+TmORB+TmFTR+TmTOP,data=tmgl2)
+brief(reg2)
+reg3=lm(MOV~TmEFG+TmORB+TmFTR+TmTOP,data=tmgl3)
+brief(reg3)
+reg4=lm(MOV~TmEFG+TmORB+TmFTR+TmTOP,data=tmgl4)
+brief(reg4)
+reg5=lm(MOV~TmEFG+TmORB+TmFTR+TmTOP,data=tmgl5)
+brief(reg5)
+reg6=lm(MOV~TmEFG+TmORB+TmFTR+TmTOP,data=tmgl6)
+brief(reg6)
+
+```
+
+
+
+```{r}
+#Seperation of Data
+new=createDataPartition(y=fullTmgl$MOV,p=.7,list=FALSE)
+train=fullTmgl[new,]
+test=fullTmgl[-new,]
+dim(train); dim(test)
+
+#OLS regression
+tc <- trainControl(method="boot",number=20)
+tmglfit=train(MOV~.,data=fullTmgl, method="lm", trControl=tc)
+
+coef(tmglfit$finalModel)
+RMSEtest<-sqrt(mean((predict(tmglfit,newdata=test)-test$MOV)^2))
+RMSEtest
+
+# KNN
+knnfit <- train(MOV~Fatigue, data=train, method="knn",
+                trControl=tc,
+                preProcess=c("center", "scale"),
+                tuneLength=10)
+RMSEtest<-sqrt(mean((predict(knnfit,newdata=test)-test$MOV)^2))
+RMSEtest
+
+predlm= predict(tmglfit, newdata=test)
+predknn=predict(knnfit, newdata=test)
+summary(predlm)
+summary(predknn)
+
+plot(knnfit)
+
+#  The kNN algorithm finds k nearest neighbors and averages y's of KNNto predict y. The kNN model is superior to the linear model because they do not assume an explicit form for f(X), which makes the model more flexible approach..
+
+roc.curve(test$Private, predictions)
+
+# As the classifier gets better ROC will grow. THis model is close to 100 % and 100 % specificity which is evident by the curve which is almost a right angle at the left of screen. THis is imporantant to the model because this will tell you how good of a model you made.
+
+```
+
+## Section IV. Individual Player Analysis
+
+# After doing some team analysis I wanted to drive futher in Player Analysis. In this section I go into specific players who had the most impact on the gmaes. I creat some visulations to test there Usage against theier induvial efficincy and I also do some anyaiss on their impact to winning. This part was important to the coaches as it gave them more insight to their best players but also was benfitial to the players as these are players that actually could move on a bigger pro sprts team and having this type of data could really improve someones game.
+
+```{r data}
+load("~/Desktop/Capstone/Data/tyler_df.rda") # Tyler English Game Log
+load("~/Desktop/Capstone/Data/sznavg2.rda") # Tyler English Season Avg Table
+load("~/Desktop/Capstone/Data/peach_df.rda")  # Peach Dixon Game log
+load("~/Desktop/Capstone/Data/sznavg3.rda") # Peach Dixon Season Avg Table
+load("~/Desktop/Capstone/Data/devon_df.rda") # Devon Gavin Game Log
+load("~/Desktop/Capstone/Data/sznavg1.rda") # Devon Gavin Season Avg Table
+load("~/Desktop/Capstone/Data/sznavg_df.rda") # Season Average Table
+```
+
+```{r}
+devonlm=lm(USG~eFG,data=devon_df)
+brief(devonlm)
+
+tylerlm=lm(USG~eFG,data=tyler_df)
+brief(tylerlm)
+
+peachlm=lm(USG~eFG,data=peach_df)
+brief(peachlm)
+
+```
+
+
+```{r time series}
+# Time Series Analysis
+
+devon_ts <- ts(devon_df$PTS, start=c(2019, 10), end=c(2020, 12), frequency = 6)
+tyler_ts <- ts(tyler_df$PTS, start=c(2019, 10), end=c(2020, 12), frequency = 6)
+peach_ts <- ts(peach_df$PTS, start=c(2019, 10), end=c(2020, 12), frequency = 6)
+
+
+plot(tyler_ts)
+plot(peach_ts)
+plot(devon_ts)
+
+
+adf.test(tyler_ts)
+adf.test(peach_ts)
+adf.test(devon_ts)
+
+# After plotting the time series, , you can see there is litte evidence of a normal distribution. When plotting,  the end of graph drops and this probably occurs because of the small amount of data. After using the Augmented Dickey Fuller test, which suggest that is the p vaule for the given inputs are less than 0.05 thsen the dtat is staintionary, we have more proof that the data is stationary  
+
+#  Based on these plots one could infer this is an additive model because the points Harden is scoring is increasing over time and the seasonality stays relatively constant.Next step is to find the right parameters to be used in the ARIMA model. We already know that the series is stationary because of the Correlation plots
+
+# finding parameters
+acf((tyler_ts))
+Pacf((tyler_ts))
+
+acf((devon_ts))
+Pacf((devon_ts))
+
+acf(peach_ts)
+Pacf(peach_ts)
+
+# fitting arima model
+arimamodel1 <-auto.arima(tyler_ts, seasonal=FALSE)
+arimamodel2 <-auto.arima(peach_ts, seasonal=FALSE)
+arimamodel3 <-auto.arima(devon_ts, seasonal=FALSE)
+
+tsdisplay(residuals(arimamodel1), lag.max=6, main='01,1,1) Model Residuals') 
+tsdisplay(residuals(arimamodel2), lag.max=6, main='01,1,1) Model Residuals') 
+tsdisplay(residuals(arimamodel3), lag.max=6, main='01,1,1) Model Residuals') 
+
+# The residuals, have no patterns and be normally distributed. There is no clear pattern present in ACF/PACF and model residuals plots. Now ready to make predictions on the future time points. We can also visualize the trends to cross validate if the model works fine.
+
+# forecasting model
+fcast <- forecast(arimamodel1, h=20)
+plot(fcast)
+fcast <- forecast(arimamodel2, h=20)
+plot(fcast)
+fcast <- forecast(arimamodel3, h=20)
+plot(fcast)
+
+
+# Seems unlikely given past behavior of the series, This model with no seasonality is plotted predictions are based on the assumption that there will be no other seasonal fluctuations so this forecast may be a naive model.
+
+fit_w_seasonality1 = auto.arima(peach_ts, seasonal=TRUE)
+fit_w_seasonality2 = auto.arima(devon_ts, seasonal=TRUE)
+fit_w_seasonality3 = auto.arima(tyler_ts, seasonal=TRUE)
+fit_w_seasonality1
+fit_w_seasonality2
+fit_w_seasonality3
+
+
+# The goal of this was to create a model using ARIMA model to predict points. The model did an ok job at doing that but flatten out way to early for me to use this model to predict the rest of the season with any confidence. After adding seasonitly to the model I feel like we got the best Model ARIMA(0,1,0), which was the best for predicting the next couple of games. Ultimately models like this are good for the short term but next steps.
+```
